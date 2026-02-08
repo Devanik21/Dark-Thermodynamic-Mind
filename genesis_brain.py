@@ -83,7 +83,7 @@ class GenesisBrain(nn.Module):
         # 3. Transformer Actor (Attention-based Policy)
         # Tiny Transformer Block for attention-based decision-making
         self.actor_attention = nn.MultiheadAttention(embed_dim=hidden_dim, num_heads=4, batch_first=True)
-        self.actor_head = nn.Linear(hidden_dim, output_dim)
+        self.actor = nn.Linear(hidden_dim, output_dim)
         
         # 4. Critic (Value Function)
         self.critic = nn.Linear(hidden_dim, 1)
@@ -123,7 +123,7 @@ class GenesisBrain(nn.Module):
         action_feat = attn_out.squeeze(1) + h_next # Residual
         
         # 4. Heads
-        vector = torch.relu(self.actor_head(action_feat))
+        vector = torch.relu(self.actor(action_feat))
         comm = torch.sigmoid(self.comm_out(h_next))
         meta = torch.sigmoid(self.meta_out(h_next))
         value = self.critic(h_next)
