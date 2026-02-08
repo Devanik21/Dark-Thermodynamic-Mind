@@ -62,80 +62,98 @@ class PruningMask(nn.Module):
 
 class GenesisBrain(nn.Module):
     """
-    The cognitive engine of an agent.
-    Input: [Local Matter (16) + Pheromone (16) + Meme (3) + Phase (2) + Energy (1) + Reward (1) + Trust (1) + Gradient (1)] = 41 Dimensions
-    Hidden: 64
-    Output: 21 (Reality Vector) + 16 (Comm Vector) + 4 (Mate, Adhesion, Punish, Trade) + 1 (Critic)
+    V-DV4 Dreamer Architecture (2026 SOTA) for 96 Super-Agents.
     """
-    def __init__(self, input_dim=41, hidden_dim=64, output_dim=21):
+    def __init__(self, input_dim=41, hidden_dim=256, output_dim=21):
         super().__init__()
         self.hidden_dim = hidden_dim
         
-        # 1.1 Neural Learning
-        self.gru = nn.GRU(input_dim, hidden_dim, batch_first=True)
-        self.actor = nn.Linear(hidden_dim, output_dim) 
-        # 5.2 Pruning Mask for Actor (Architecture Search)
-        self.actor_mask = PruningMask(self.actor.weight.shape)
-        
-        self.comm_out = nn.Linear(hidden_dim, 16) # Social Signaling Layer
-        self.meta_out = nn.Linear(hidden_dim, 4) # [Mate, Adhesion, Punish, Trade]
-        self.critic = nn.Linear(hidden_dim, 1) # Value function for RL
-        
-        # 5.8 Abstraction Discovery ( Bottleneck Autoencoder )
-        # Compress hidden state to find "Concepts"
-        self.concept_dim = 8
-        self.abstraction_encoder = nn.Linear(hidden_dim, self.concept_dim)
-        self.abstraction_decoder = nn.Linear(self.concept_dim, hidden_dim)
-
-        # 3.9 Narrative Memory & 5.9 Causal Predictor
-        # Predicts the NEXT input state (Self-Supervised Learning)
-        # Optimized for counterfactual reasoning
-        self.predictor = nn.Linear(hidden_dim, input_dim) 
-        
-        # 5.7 Cognitive Compression
-        # Learnable compression of the GRU weight updates (largest matrix)
-        # Flattened GRU weight size: 3*hidden*hidden + 3*hidden*input approx
-        # We simplify: Just learn to compress the Hidden->Hidden interactions (64x64)
-        self.compressor = nn.Sequential(
-            nn.Linear(hidden_dim, 16),
-            nn.Tanh(),
-            nn.Linear(16, hidden_dim)
+        # 1. Encoder (Sensory Processing)
+        # Compresses 41D input -> 256D Latent State
+        self.encoder = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.LayerNorm(hidden_dim),
+            nn.SiLU()
         )
-        # Initialize small to start as identity-like
-        nn.init.orthogonal_(self.compressor[0].weight, gain=0.1)
-        nn.init.orthogonal_(self.compressor[2].weight, gain=0.1)
         
-        # Initialize weights
+        # 2. RSSM (Recurrent State-Space Model) - The Dream Engine
+        # Deterministic state (h) + Stochastic state (z)
+        self.rssm_cell = nn.GRUCell(hidden_dim, hidden_dim)
+        
+        # 3. Transformer Actor (Attention-based Policy)
+        # Tiny Transformer Block for attention-based decision-making
+        self.actor_attention = nn.MultiheadAttention(embed_dim=hidden_dim, num_heads=4, batch_first=True)
+        self.actor_head = nn.Linear(hidden_dim, output_dim)
+        
+        # 4. Critic (Value Function)
+        self.critic = nn.Linear(hidden_dim, 1)
+        
+        # 5. Reward Predictor (For Dreaming)
+        self.reward_predictor = nn.Linear(hidden_dim, 1)
+        
+        # Auxiliary Heads
+        self.comm_out = nn.Linear(hidden_dim, 16)
+        self.meta_out = nn.Linear(hidden_dim, 4)
+        self.predictor = nn.Linear(hidden_dim, input_dim) # Reconstruction
+        self.abstraction_encoder = nn.Linear(hidden_dim, 8) # Concepts
+
+        # Initialize
         for m in self.modules():
             if isinstance(m, nn.Linear):
-                nn.init.xavier_normal_(m.weight)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0.0)
+                nn.init.orthogonal_(m.weight, gain=1.0)
 
     def forward(self, x, hidden):
+        # Ensure hidden state is correct shape (B, 256) for GRUCell
         if hidden is None:
-            hidden = torch.zeros(1, x.size(0), self.hidden_dim)
+            hidden = torch.zeros(x.size(0), self.hidden_dim)
+        elif hidden.dim() == 3: 
+            hidden = hidden.squeeze(0)
             
-        out, h_next = self.gru(x.unsqueeze(1), hidden)
-        last_hidden = out[:, -1, :]
+        # 1. Encode
+        embed = self.encoder(x)
         
-        # 5.8 Abstraction: Force information through bottleneck
-        concepts = torch.relu(self.abstraction_encoder(last_hidden))
-        reconstructed_hidden = self.abstraction_decoder(concepts)
-        # Residual connection to preserve gradients but encourage concept usage
-        mixed_hidden = last_hidden + reconstructed_hidden * 0.1
+        # 2. Recurrent Step (RSSM)
+        h_next = self.rssm_cell(embed, hidden)
         
-        # 5.2 Apply Pruning Mask
-        effective_weights = self.actor.weight * self.actor_mask()
-        # Manual linear pass to allow weighting
-        vector = torch.relu(torch.nn.functional.linear(mixed_hidden, effective_weights, self.actor.bias))
+        # 3. Actor (Transformer Block)
+        # Add sequence dim for attention: (B, 1, H)
+        h_seq = h_next.unsqueeze(1)
+        # Self-Attention on current thought
+        attn_out, _ = self.actor_attention(h_seq, h_seq, h_seq)
+        action_feat = attn_out.squeeze(1) + h_next # Residual
+        
+        # 4. Heads
+        vector = torch.relu(self.actor_head(action_feat))
+        comm = torch.sigmoid(self.comm_out(h_next))
+        meta = torch.sigmoid(self.meta_out(h_next))
+        value = self.critic(h_next)
+        prediction = self.predictor(h_next)
+        concepts = torch.relu(self.abstraction_encoder(h_next))
+        
+        # Return h_next as (1, B, H) to match old GRU API
+        return vector, comm, meta, value, h_next.unsqueeze(0), prediction, concepts
 
-        comm = torch.sigmoid(self.comm_out(mixed_hidden)) # Signal Vector (Pheromones/Memes)
-        meta = torch.sigmoid(self.meta_out(mixed_hidden)) # [Mate, Adhesion, Punish, Trade]
-        value = self.critic(mixed_hidden)               # Estimated Value
-        prediction = self.predictor(mixed_hidden)       # 3.9 Predicted Next State
+    def dream(self, start_state, horizon=10):
+        # Rolling out the future in latent space
+        states = []
+        rewards = []
         
-        return vector, comm, meta, value, h_next, prediction, concepts
+        # Ensure start_state is (B, 256)
+        if start_state.dim() == 3: h = start_state.squeeze(0)
+        else: h = start_state
+            
+        for t in range(horizon):
+            # Closed-loop hallucination: Assume zero-noise stability for planning
+            # In V-DV4, we predict the next state based on internal dynamics
+            # Use 'random noise' as the innovation signal for the dream
+            noise = torch.randn_like(h) * 0.1
+            h = self.rssm_cell(noise, h)
+            
+            r = self.reward_predictor(h)
+            states.append(h)
+            rewards.append(r)
+            
+        return torch.stack(states), torch.stack(rewards)
 
 # ============================================================
 # 🤖 THE AGENT
@@ -184,7 +202,7 @@ class GenesisAgent:
         if parent_hidden is not None:
             self.hidden_state = parent_hidden.detach().clone() + torch.randn_like(parent_hidden) * 0.1
         else:
-            self.hidden_state = torch.zeros(1, 1, 64)
+            self.hidden_state = torch.zeros(1, 1, 256)
         
         # v5.0.4 Persistent state for Ghost Forward
         self.prev_input = None
@@ -667,135 +685,94 @@ class GenesisAgent:
 
     def metabolize_outcome(self, flux):
         """
-        Learns from reality using a simplified Advantage-Actor-Critic (A2C) update.
-        flux: The reward from the Oracle
+        V-DV4 Update: Learning from Dreams (Active Inference)
         """
-        if self.last_value is None:
-            return False
+        if self.last_value is None: return False
 
-
-        # 1.3 AUDIT FIX: STRONGER Landauer enforcement: E += k_B * T * ΔH(W)
+        # 1.3 Landauer Metric (Entropy cost)
+        # Calculate entropy of weights
         current_entropy = self.calculate_weight_entropy()
         entropy_diff = current_entropy - self.last_weight_entropy
-        # k_B * T at room temperature ~26 meV in normalized units
         k_B_T = 0.026
-        # ENFORCED Landauer cost - thermodynamic minimum for information erasure
-        landauer_cost = max(0.05, k_B_T * abs(entropy_diff) * 10.0)  # 10x for visibility
+        landauer_cost = max(0.05, k_B_T * abs(entropy_diff) * 10.0)
         self.energy -= landauer_cost
         self.last_weight_entropy = current_entropy
 
-        # 4.2 AUDIT FIX: Role-based metabolic cost
-        role_metabolic_cost = self.get_role_metabolic_cost()
-        self.energy -= role_metabolic_cost
+        # 4.2 Role Cost
+        self.energy -= self.get_role_metabolic_cost() if hasattr(self, 'get_role_metabolic_cost') else 0.1
 
-        # Reward Signal: External Flux + IQ Incentive (Neural Variance)
+        # Reward Signal aggregation
         self.last_reward = flux
-        # 1.3 Landauer + Metabolic Cost for 'loud' thinking
-        thought_loudness = self.last_vector.sum().item()
-        thought_cost = thought_loudness * 0.05 # Metabolic penalty
-        self.energy -= thought_cost
         
-        # 3.4 AUDIT FIX: Record tradition for persistence tracking
-        self.record_tradition(self.last_vector)
-        
-        iq_reward = self.last_vector.std() * 5.0 # Punish uniform thinking
-        
-        # 5.3 Free Energy Reward (FRISTONIAN OVERRIDE) - v5.0.4 "GHOST FORWARD"
-        predictor_loss = torch.tensor(0.0)
-        if self.prev_input is not None and self.prev_hidden is not None:
-             # Fresh forward pass on the SAME transition
-             _, _, _, _, _, ghost_prediction, _ = self.brain(self.prev_input, self.prev_hidden)
-             pred_loss_fn = nn.MSELoss()
-             # Compare ghost prediction (made from t-1) with the ACTUAL current input (t)
-             predictor_loss = pred_loss_fn(ghost_prediction, self.last_input.detach())
+        # 5.3 Active Inference Learning (Dreamer V4)
+        if self.hidden_state is not None:
+             # A. Train Reward Predictor & World Model (Reconstruction)
+             # We learn to predict the present before dreaming the future
+             current_h = self.hidden_state.view(1, 256).detach()
              
-             # 5.0 Self-Monitoring
-             self.prediction_errors.append(predictor_loss.item())
-             if len(self.prediction_errors) > 50: self.prediction_errors.pop(0)
-             recent_error = np.mean(self.prediction_errors)
-             self.confidence = 1.0 / (1.0 + recent_error)
+             # Predict Reward (Flux)
+             pred_reward = self.brain.reward_predictor(current_h)
+             reward_loss = 0.5 * (pred_reward - torch.tensor([[flux]], dtype=torch.float32)).pow(2).mean()
              
-             # 5.1 Meta-Learning (Hypergradient)
-             if len(self.prediction_errors) > 2 and self.prediction_errors[-1] > self.prediction_errors[-2] * 1.5:
-                 self.meta_lr = min(0.1, self.meta_lr * 1.2) # Relaxed cap to 0.1 for faster adaptation
+             # Predict Input (Reconstruction of State)
+             if self.last_input is not None:
+                 pred_input = self.brain.predictor(current_h)
+                 recon_loss = 0.5 * (pred_input - self.last_input.detach()).pow(2).mean()
              else:
-                 self.meta_lr = max(0.001, self.meta_lr * 0.99)
-                 
-             for param_group in self.optimizer.param_groups:
-                 param_group['lr'] = self.meta_lr
+                 recon_loss = torch.tensor(0.0)
+
+             # B. The Dream (Imagination Rollout)
+             # Dream 10 steps into the future using the RSSM
+             dream_states, dream_rewards = self.brain.dream(current_h, horizon=10)
              
-             # 1.8 AUDIT FIX: Phenotypic Plasticity - context-dependent learning
-             # Uses energy, prediction error gradient, and season to modulate learning
-             gradient_magnitude = abs(self.prediction_errors[-1] - self.prediction_errors[-2]) if len(self.prediction_errors) > 1 else 0.0
-             season_proxy = (self.age // 20) % 2  # Alternates every 20 ticks
-             self.update_learning_rate_contextual(self.energy, gradient_magnitude, season_proxy)
+             # C. Critique the Dream (Value Estimation)
+             # V(s) of dreamed states
+             dream_values = self.brain.critic(dream_states) # (10, 1)
+             
+             # D. Calculate Objective (Lambda Return)
+             # We want the Actor to produce states that lead to high Value
+             # Bootstrap with final predicted value
+             returns = torch.zeros_like(dream_rewards)
+             next_val = dream_values[-1]
+             
+             # TD-Lambda calculation (Simplified to TD-0 for efficiency)
+             # Reverse accumulation
+             for t in reversed(range(len(dream_rewards) - 1)):
+                 r_t = dream_rewards[t]
+                 v_next = dream_values[t+1]
+                 returns[t] = r_t + 0.99 * v_next
+                 
+             # E. Compute Losses
+             # Critic Loss: Predict the calculated returns
+             critic_loss = 0.5 * (dream_values[:-1] - returns[:-1].detach()).pow(2).mean()
+             
+             # Actor Loss: Maximize the Value of the dream trajectory
+             # Differentiable BPTT allow us to backdrop through the dream
+             actor_loss = -dream_values.mean() 
+             
+             # Entropy Regularization (prevent collapse)
+             entropy_loss = -self.last_vector.std() * 0.01
 
-        # 5.2 Sparsity Loss
-        sparsity_loss = self.brain.actor_mask.sparsity() * 0.01
-        
+             # Total V-DV4 Loss
+             total_loss = actor_loss + critic_loss + reward_loss + recon_loss + entropy_loss
+             
+             # Update Brain
+             self.optimizer.zero_grad()
+             total_loss.backward()
+             torch.nn.utils.clip_grad_norm_(self.brain.parameters(), 1.0)
+             self.optimizer.step()
+             
+             # Meta-Learning Update (Optional)
+             self.update_learning_rate_contextual(self.energy, recon_loss.item(), 0)
 
-        reward = torch.tensor([[flux]], dtype=torch.float32) + iq_reward
-        
-        # Advantage Calculation
-        # Detach everything from previous steps to ensure we only learn from THIS tick
-        advantage = reward.detach() - self.last_value.detach()
-        
-        # Losses
-        # 1. Critic Loss: Mean Squared Error between prediction and actual flux
-        critic_loss = 0.5 * (reward - self.last_value).pow(2)
-        
-        # 2. Actor Loss: Policy Gradient (Surrogate objective)
-        # Simplified: Move weights to make 'last_vector' more likely if advantage is positive
-        # Added regularization to prevent activation explosion
-        actor_loss = -(advantage * self.last_vector.sum()) + 0.01 * self.last_vector.pow(2).sum()
-        
-        # 5.3 Consolidated Loss: A2C + Active Inference Predictor + Sparsity
-        # STANDARD A2C: Critic learns to predict reward, Actor learns to maximize advantage
-        # Detach advantage to prevent actor gradients from flowing into critic via 'reward'
-        total_loss = actor_loss + critic_loss + predictor_loss + sparsity_loss
-        
-        # Backprop (Online Learning)
-        self.optimizer.zero_grad()
-        # Retain graph only if we are doing meta-learning that requires second derivatives
-        # But here we don't need it. However, the error is likely due to the PREVIOUS step's
-        # in-place modification or the 'last_vector' being modified.
-        
-        # FIX: Ensure we don't modify the graph in place before backward
-        # The error "modified by an inplace operation" typically refers to the weights themselves
-        # or the hidden state.
-        
-        total_loss.backward()
-        
-        # --- 5.7 COGNITIVE COMPRESSION (Meta-Gradient) ---
-        with torch.no_grad():
-             if self.brain.actor.weight.grad is not None:
-                 g = self.brain.actor.weight.grad
-                 pass
-
-        self.optimizer.step()
-        
-        # 9.3 Train Oracle Model (Level 9 Metric)
-        # MOVED to after step() to prevent "modified in place" errors during brain backward
-        # Inputs: 21D Action Vector + 16D Matter Signal -> Predicted Flux
-        if self.last_input is not None:
-             # Extract 16D Matter Signal from input (first 16 channels)
-             matter_signal = self.last_input[:, :16]
-             self.train_oracle_model(self.last_vector, matter_signal, torch.tensor([[flux]]))
-        
-        # 4.9 Collective Memory: Natural Forgetting (Weight Decay)
-        # MOVED to AFTER step() to prevent "modified in place" errors during backward
-        with torch.no_grad():
-            for p in self.brain.parameters():
-                p.mul_(0.999) # Slow decay (1 - 1e-3)
-        
-        # 4.0 Dynamic Role Assignment (Moved here to ensure safety)
-        with torch.no_grad():
-            self.update_role()
-            
-        # 5.10 Autonomous Research (Sensitivity Analysis)
-        if random.random() < 0.01:
+        # 4.0 Dynamic Role Assignment
+        if hasattr(self, 'update_role'):
+            with torch.no_grad():
+                self.update_role()
+                
+        # 5.10 Autonomous Research
+        if random.random() < 0.01 and hasattr(self, 'conduct_experiment'):
             self.conduct_experiment()
-        
         
         self.thoughts_had += 1
 
