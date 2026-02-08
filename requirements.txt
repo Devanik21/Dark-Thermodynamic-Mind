@@ -1,0 +1,9 @@
+streamlit
+torch
+numpy
+pandas
+plotly
+scikit-learn
+networkx
+psutil
+
