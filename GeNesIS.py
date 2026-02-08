@@ -94,7 +94,10 @@ def init_system():
 
     if "world" not in st.session_state:
         st.session_state.world = GenesisWorld(size=40)
-        for _ in range(100):
+    if "world" not in st.session_state:
+        st.session_state.world = GenesisWorld(size=40)
+        # Council of 96: Fewer agents, higher intelligence per capita
+        for _ in range(40):
             x, y = np.random.randint(0, 40), np.random.randint(0, 40)
             agent = GenesisAgent(x, y)
             st.session_state.world.agents[agent.id] = agent
@@ -428,8 +431,8 @@ def update_simulation():
             
         # 📉 Malthusian Decay (Crowding Penalty)
         # 1.4 Environmental Pressure: Scarcity scaling
-        # ELASTIC: Only apply overcrowding penalty if population is healthy (> 450)
-        if len(world.agents) >= 480:
+        # ELASTIC: Only apply overcrowding penalty if population is healthy (> 90)
+        if len(world.agents) >= 90:
             # MIDDLE PATH FIX: Balanced decay for Darwinian Selection
             # Was: 0.1 + log/10.0 (~0.7 cost) -> Now: 0.1 + log/4.0 (~1.6 cost)
             malthusian_cost = 0.1 + (np.log1p(len(world.agents)) / 4.0)
@@ -439,16 +442,16 @@ def update_simulation():
             
             agent.energy -= malthusian_cost 
         
-        # 🧬 MITOSIS (Hard Cap: 512 per user request)
-        # Nobel Safeguard: Panic Mitosis if pop < 300 (Cheaper cost, lower threshold)
-        if len(world.agents) < 300:
+        # 🧬 MITOSIS (Hard Cap: 96 per user request - Council of 96)
+        # Nobel Safeguard: Panic Mitosis if pop < 50 (Cheaper cost, lower threshold)
+        if len(world.agents) < 50:
             mitosis_threshold = 30.0
             mitosis_cost = 10.0
         else:
             mitosis_threshold = 90.0
             mitosis_cost = 40.0
         
-        if agent.energy > mitosis_threshold and len(world.agents) < 512:
+        if agent.energy > mitosis_threshold and len(world.agents) < 96:
             agent.energy -= mitosis_cost 
             off_x = (agent.x + np.random.randint(-1, 2)) % 40
             off_y = (agent.y + np.random.randint(-1, 2)) % 40
