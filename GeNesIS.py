@@ -9,6 +9,7 @@ import zipfile
 import io
 import torch
 import random
+import gc
 from genesis_world import GenesisWorld, Resource, Structure, Trap, Barrier, Battery, Cultivator, InfrastructureNetwork, TerrainModification
 from genesis_brain import GenesisAgent
 from sklearn.cluster import KMeans
@@ -84,7 +85,7 @@ st.markdown("""
 # ============================================================
 # 🛠️ INITIALIZATION HOOKS
 # ============================================================
-SYSTEM_VERSION = "11.0.9" # Level 10: The Omega Point - Complete Implementation
+SYSTEM_VERSION = "11.0.6" # Level 10: The Omega Point - Complete Implementation
 
 def init_system():
     # Force reset if version mismatch
@@ -216,24 +217,25 @@ def update_simulation():
         # 1.7 Gradient Sensing (Stress Response)
         gradient_val = world.get_energy_gradient(agent.x, agent.y).item()
 
-        # Decide now returns (Vector, CommVector, Mate, Adhesion, Punish, Trade, MemeWrite, SpecialIntent)
-        reality_vector_tensor, comm_vector, mate_desire, adhesion_val, punish_val, trade_val, meme_write, special_intent = agent.decide(
-            signal, 
-            pheromone_16=pheromone_vector, 
-            meme_3=meme_vector, # 3.3 Input
-            env_phase=env_phase,
-            social_trust=social_trust,
-            gradient=gradient_val
-        ) 
-        
-        # 3.3 Stigmergy: Write to Meme Grid
-        # Decaying write to avoid saturation: Old * 0.9 + New * 0.1
-        world.meme_grid[mx, my] = world.meme_grid[mx, my] * 0.9 + meme_write.detach().cpu().numpy().flatten() * 0.1
-        
-        flux, log_text = world.resolve_quantum_state(
-            agent, reality_vector_tensor, emit_vector=comm_vector, 
-            adhesion=adhesion_val, punish=punish_val, trade=trade_val
-        ) 
+        # 🔧 MEMORY FIX: Inference mode for decision and state resolution
+        with torch.inference_mode():
+            # Decide now returns (Vector, CommVector, Mate, Adhesion, Punish, Trade, MemeWrite, SpecialIntent)
+            reality_vector_tensor, comm_vector, mate_desire, adhesion_val, punish_val, trade_val, meme_write, special_intent = agent.decide(
+                signal, 
+                pheromone_16=pheromone_vector, 
+                meme_3=meme_vector, # 3.3 Input
+                env_phase=env_phase,
+                social_trust=social_trust,
+                gradient=gradient_val
+            ) 
+            
+            # 3.3 Stigmergy: Write to Meme Grid
+            world.meme_grid[mx, my] = world.meme_grid[mx, my] * 0.9 + meme_write.detach().cpu().numpy().flatten() * 0.1
+            
+            flux, log_text = world.resolve_quantum_state(
+                agent, reality_vector_tensor, emit_vector=comm_vector, 
+                adhesion=adhesion_val, punish=punish_val, trade=trade_val
+            ) 
 
         # --- PROCESS LEVEL 6-10 INTENTS ---
         if special_intent:
@@ -415,6 +417,9 @@ def update_simulation():
                             "tick": world.time_step,
                             "agent": agent.id
                         })
+                        # 🔧 MEMORY FIX: Cap global registry
+                        if len(st.session_state.global_registry) > 100:
+                            st.session_state.global_registry.pop(0)
         
         if "IDLE" not in log_text and "MOVE" not in log_text:
              # Filter noise: Only show flux events if they are significant (> 10.0) or are special events
@@ -568,6 +573,12 @@ def update_simulation():
         st.session_state.event_log.insert(0, e) 
         st.session_state.total_events_count += 1 # Global discovery counter
     st.session_state.event_log = st.session_state.event_log[:20]
+
+    # 🔧 MEMORY FIX: Periodic Garbage Collection
+    if world.time_step % 50 == 0:
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
 update_simulation()
 
@@ -2542,7 +2553,6 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
-
 
 
 

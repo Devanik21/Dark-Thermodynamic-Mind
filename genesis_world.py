@@ -1221,6 +1221,10 @@ class GenesisWorld:
                     'Pattern': p
                 })
         
+        # 🔧 MEMORY FIX: Cap discovery log
+        if len(self.discovery_log) > 100:
+            self.discovery_log = self.discovery_log[-100:]
+        
         # Check for new exploits to log
         for e in self.discovered_physics_exploits:
             pattern_name = f"exploit_{e.get('state_hash', 0) % 1000}"
@@ -1230,6 +1234,10 @@ class GenesisWorld:
                     'Pattern': pattern_name
                 })
                 known_patterns.add(pattern_name)
+        
+        # 🔧 MEMORY FIX: Cap physics patterns
+        if len(self.discovered_physics_patterns) > 50:
+            self.discovered_physics_patterns = self.discovered_physics_patterns[-50:]
 
     # ============================================================
     # ♾️ LEVEL 10: THE OMEGA POINT METHODS
@@ -1415,8 +1423,8 @@ class GenesisWorld:
             'delta': delta
         })
         
-        # Keep only last 100 entries
-        if len(self.invention_history) > 100:
+        # Keep only last 50 entries (Reduced from 100 for memory)
+        if len(self.invention_history) > 50:
             self.invention_history.pop(0)
         
         discoveries = sum(1 for e in self.invention_history if e['type'] == 'discovery')

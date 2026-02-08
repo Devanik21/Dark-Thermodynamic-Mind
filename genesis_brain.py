@@ -762,8 +762,12 @@ class GenesisAgent:
              torch.nn.utils.clip_grad_norm_(self.brain.parameters(), 1.0)
              self.optimizer.step()
              
+             # 🔧 MEMORY FIX: Explicitly clear large dream tensors
+             del dream_states, dream_rewards, dream_values, returns, total_loss
+             
              # Meta-Learning Update (Optional)
              self.update_learning_rate_contextual(self.energy, recon_loss.item(), 0)
+             del recon_loss, reward_loss
 
         # 4.0 Dynamic Role Assignment
         if hasattr(self, 'update_role'):
