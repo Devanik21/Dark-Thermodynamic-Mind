@@ -760,8 +760,13 @@ class GenesisAgent:
              self.optimizer.zero_grad()
              total_loss.backward()
              torch.nn.utils.clip_grad_norm_(self.brain.parameters(), 1.0)
-             self.optimizer.step()
-             
+             try:
+                 self.optimizer.step()
+             except KeyError:
+                 # 🔥 HOTFIX: Re-initialize optimizer if state is corrupted (e.g. from reload)
+                 self.optimizer = optim.Adam(self.brain.parameters(), lr=0.005) 
+                 self.optimizer.step()
+
              # 🔧 MEMORY FIX: Explicitly clear large dream tensors
              del dream_states, dream_rewards, dream_values, returns, total_loss
              

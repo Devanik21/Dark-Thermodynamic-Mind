@@ -217,8 +217,8 @@ def update_simulation():
         # 1.7 Gradient Sensing (Stress Response)
         gradient_val = world.get_energy_gradient(agent.x, agent.y).item()
 
-        # 🔧 MEMORY FIX: Inference mode for decision and state resolution
-        with torch.inference_mode():
+        # 🔧 MEMORY FIX: Use no_grad instead of inference_mode to avoid "Inference tensors cannot be saved for backward" error
+        with torch.no_grad():
             # Decide now returns (Vector, CommVector, Mate, Adhesion, Punish, Trade, MemeWrite, SpecialIntent)
             reality_vector_tensor, comm_vector, mate_desire, adhesion_val, punish_val, trade_val, meme_write, special_intent = agent.decide(
                 signal, 
