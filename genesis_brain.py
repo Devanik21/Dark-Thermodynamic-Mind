@@ -611,7 +611,7 @@ class GenesisAgent:
             # But let's just use raw value thresholds
             
             if struct_type_val < -0.5: s_type = "barrier" # Negative value
-            elif struct_type_val < 0.1: s_type = "trap"
+            elif struct_type_val < 0.01: s_type = "trap"
             elif struct_type_val < 0.5: s_type = "battery"
             elif struct_type_val < 1.0: s_type = "cultivator"
             else: s_type = "generic"
@@ -2226,6 +2226,7 @@ class GenesisAgent:
         if hasattr(self, 'role_history'):
             self.role_history.append(self.role)
             if len(self.role_history) > 100: self.role_history.pop(0)
+
 
 
 
