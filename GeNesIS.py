@@ -4,7 +4,7 @@ import pandas as pd
 import time
 import plotly.express as px
 import plotly.graph_objects as go
-import json 
+import json
 import zipfile
 import io
 import torch
@@ -85,7 +85,7 @@ st.markdown("""
 # ============================================================
 # 🛠️ INITIALIZATION HOOKS
 # ============================================================
-SYSTEM_VERSION = "11.0.9" # Level 10: The Omega Point - Complete Implementation
+SYSTEM_VERSION = "11.0.6" # Level 10: The Omega Point - Complete Implementation
 
 def init_system():
     # Force reset if version mismatch
@@ -337,7 +337,7 @@ def update_simulation():
         
         # Only fertile agents (Queens) reproduce. Others must support them (feed).
         can_reproduce = agent.is_fertile and agent.energy > repro_thresh
-        if mate_desire > 0.5 and can_reproduce and n_pop < 512:
+        if mate_desire > 0.5 and can_reproduce and n_pop < 128:
             # Look for partner
             partners = [
                 other for other in agents 
@@ -447,7 +447,7 @@ def update_simulation():
             
             agent.energy -= malthusian_cost 
         
-        # 🧬 MITOSIS (Hard Cap: 96 per user request - Council of 96)
+        # 🧬 MITOSIS (Hard Cap: 128 per user request)
         # Nobel Safeguard: Panic Mitosis if pop < 50 (Cheaper cost, lower threshold)
         if len(world.agents) < 50:
             mitosis_threshold = 30.0
@@ -456,7 +456,7 @@ def update_simulation():
             mitosis_threshold = 90.0
             mitosis_cost = 40.0
         
-        if agent.energy > mitosis_threshold and len(world.agents) < 96:
+        if agent.energy > mitosis_threshold and len(world.agents) < 128:
             agent.energy -= mitosis_cost 
             off_x = (agent.x + np.random.randint(-1, 2)) % 40
             off_y = (agent.y + np.random.randint(-1, 2)) % 40
@@ -2553,8 +2553,6 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
-
-
 
 
 
