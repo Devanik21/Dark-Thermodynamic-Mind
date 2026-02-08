@@ -1446,16 +1446,36 @@ class GenesisAgent:
             return False
         
         with torch.no_grad():
-            weight_sample = next(self.brain.parameters()).flatten()[:64]
+            dim = 256
+            weight_sample = next(self.brain.parameters()).flatten()[:dim]
+            # Handle case where weights might be smaller than dim (unlikely for V4 but safe)
+            if len(weight_sample) < dim:
+                 pad = torch.zeros(dim - len(weight_sample))
+                 if weight_sample.is_cuda: pad = pad.cuda()
+                 weight_sample = torch.cat([weight_sample, pad])
+            
             weight_encoding = torch.sigmoid(weight_sample).unsqueeze(0)
             
-            if self.last_input.shape[1] >= 64:
-                combined = self.last_input[:, :64] + weight_encoding * 0.1
+            if self.last_input is not None and self.last_input.shape[1] >= dim:
+                combined = self.last_input[:, :dim] + weight_encoding * 0.1
+            elif self.last_input is not None:
+                # Pad last_input to dim
+                padding = torch.zeros(1, dim - self.last_input.shape[1])
+                if self.last_input.is_cuda: padding = padding.cuda()
+                combined = torch.cat([self.last_input, padding], dim=1) + weight_encoding * 0.1
             else:
-                combined = self.last_input
-            
-            predicted_output = self.brain.actor(combined[:, :64] if combined.shape[1] >= 64 else 
-                                                 torch.cat([combined, torch.zeros(1, 64-combined.shape[1])], dim=1))
+                 combined = weight_encoding
+
+            # Ensure combined is exactly (1, 256)
+            if combined.shape[1] != dim:
+                 if combined.shape[1] > dim:
+                     combined = combined[:, :dim]
+                 else:
+                     padding = torch.zeros(1, dim - combined.shape[1])
+                     if combined.is_cuda: padding = padding.cuda()
+                     combined = torch.cat([combined, padding], dim=1)
+
+            predicted_output = self.brain.actor(combined)
             
             if self.last_vector is not None:
                 actual_output = self.last_vector
