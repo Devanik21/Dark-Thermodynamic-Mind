@@ -866,7 +866,14 @@ class GenesisAgent:
     def _apply_genome(self, genome):
         """Loads brain state from parent(s)."""
         # Remove metadata before loading into brain
-        brain_state = {k: v for k, v in genome.items() if k not in ['tag', 'caste_gene']}
+        raw_state = {k: v for k, v in genome.items() if k not in ['tag', 'caste_gene']}
+        
+        # 🔧 V-DV4 COMPATIBILITY FIX: Map legacy 'actor_head' keys to 'actor'
+        brain_state = {}
+        for k, v in raw_state.items():
+            new_key = k.replace('actor_head', 'actor')
+            brain_state[new_key] = v
+            
         self.brain.load_state_dict(brain_state)
         
         # Inherit tag with slight drift
