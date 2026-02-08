@@ -936,14 +936,13 @@ with tab_micro:
         
         with col_spec_a:
             st.markdown(f"**Agent Specs: `{selected_id[:8]}`**")
-            st.write(f"- **Architecture**: [41] -> GRU[64] -> [21+16]")
+            st.write(f"- **Architecture**: [41] -> V-DV4[256] -> [21+16]")
             st.write(f"- **Optimizer**: Adam (lr=0.001)")
-            st.write(f"- **Layers**: Encoder, GRU, Actor, Critic, Comm, Meta, Predictor")
+            st.write(f"- **Layers**: Encoder, RSSM, Transformer Actor, Critic, Rew-Pred")
             
             # Weight Stats
             with torch.no_grad():
-                # Note: Brain architecture updated to GRU(input, hidden)
-                # target.brain.encoder no longer exists. Using target.brain.actor or similar.
+                # Note: Brain architecture updated to V-DV4
                 w_actor = target.brain.actor.weight.mean().item()
                 w_std = target.brain.actor.weight.std().item()
                 st.write(f"- **Synaptic Density**: `{w_actor:.4f}`")
@@ -952,14 +951,14 @@ with tab_micro:
         with col_spec_b:
             # Visualize Hidden State (The "Mind State")
             if target.hidden_state is not None:
-                # Shape is (1, 1, 64) due to GRU batch requirements. Reshape to 2D for imshow.
+                # Shape is (1, 1, 256) due to GRU batch requirements. Reshape to 2D for imshow.
                 h_state = target.hidden_state.detach().cpu().numpy().reshape(1, -1)
                 if st.session_state.get("show_charts", False):
                     fig_h = px.imshow(
                         h_state, 
                         color_continuous_scale='Viridis',
-                        labels=dict(x="Memory Dim (0-63)", color="Charge"),
-                        title="Short-Term Memory (GRU Hidden State)"
+                        labels=dict(x="Memory Dim (0-255)", color="Charge"),
+                        title="Short-Term Memory (V-DV4 Latent State)"
                     )
                     fig_h.update_layout(height=150, margin=dict(l=0,r=0,t=30,b=0), yaxis=dict(visible=False))
                     st.plotly_chart(fig_h, width='stretch')
