@@ -1,4 +1,4 @@
-# GeNesIS: Generative Neural System for Information-theoretic Self-awareness
+# DaRkGeNesIS: Generative Neural System for Information-theoretic Self-awareness
 
 ## Dark Genesis: Hippocampal Replay in Silico
 
