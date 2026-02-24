@@ -728,7 +728,8 @@ class GenesisWorld:
         current_spawn_prob = max(0.8, np.exp(-self.scarcity_lambda * self.time_step))
         
         # 1.6 Circadian Rhythms: Environment Phase
-        self.env_phase = (self.time_step / SEASON_LENGTH) * 2 * np.pi
+        current_len = SUMMER_LENGTH if self.current_season % 2 == 0 else WINTER_LENGTH
+        self.env_phase = (self.season_timer / current_len) * 2 * np.pi
         
         # Phase 13: Biology Update
         self.update_pheromones()
