@@ -350,9 +350,9 @@ class GenesisAgent:
         # ============================================================
         # 8.0 Internal Simulation (World Model)
         self.world_model = nn.Sequential(
-            nn.Linear(41 + 21, 64),  # State + Action -> Next State
+            nn.Linear(41 + 21, 128),  # State + Action -> Next State (PPO-128 upgrade)
             nn.Tanh(),
-            nn.Linear(64, 41)
+            nn.Linear(128, 41)
         )
         self.world_model_optimizer = optim.Adam(self.world_model.parameters(), lr=0.001)
         
@@ -1587,16 +1587,20 @@ class GenesisAgent:
             return False
         
         with torch.no_grad():
-            weight_sample = next(self.brain.parameters()).flatten()[:64]
+            # PPO-128: Sampling more weights to match hidden_dim
+            weight_sample = next(self.brain.parameters()).flatten()[:128]
             weight_encoding = torch.sigmoid(weight_sample).unsqueeze(0)
             
-            if self.last_input.shape[1] >= 64:
-                combined = self.last_input[:, :64] + weight_encoding * 0.1
+            # Map input to 128 dimensions to match actor input
+            if self.last_input.shape[1] < 128:
+                # Pad last_input to 128
+                padded_input = torch.cat([self.last_input, torch.zeros(1, 128 - self.last_input.shape[1])], dim=1)
             else:
-                combined = self.last_input
+                padded_input = self.last_input[:, :128]
+                
+            combined = padded_input + weight_encoding * 0.1
             
-            predicted_output = self.brain.actor(combined[:, :64] if combined.shape[1] >= 64 else 
-                                                 torch.cat([combined, torch.zeros(1, 64-combined.shape[1])], dim=1))
+            predicted_output = self.brain.actor(combined)
             
             if self.last_vector is not None:
                 actual_output = self.last_vector
