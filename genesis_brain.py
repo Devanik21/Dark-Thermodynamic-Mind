@@ -744,7 +744,7 @@ class GenesisAgent:
         return vector, comm_vector[0], mate_desire, adhesion_val, punish_val, trade_val, meme_write, special_intent
         
 
-    def metabolize_outcome(self, flux):
+    def metabolize_outcome(self, flux, world_season=0):
         """
         PPO-128: Learns from reality using Proximal Policy Optimization.
         Replaces the old A2C update with clipped surrogate objective for stability.
@@ -804,7 +804,7 @@ class GenesisAgent:
              
              # 1.8 AUDIT FIX: Phenotypic Plasticity
              gradient_magnitude = abs(self.prediction_errors[-1] - self.prediction_errors[-2]) if len(self.prediction_errors) > 1 else 0.0
-             season_proxy = (self.age // 20) % 2 
+             season_proxy = world_season % 2 
              self.update_learning_rate_contextual(self.energy, gradient_magnitude, season_proxy)
 
         # 5.2 Sparsity Loss

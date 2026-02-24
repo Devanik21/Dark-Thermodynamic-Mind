@@ -788,10 +788,22 @@ class GenesisWorld:
         
         if self.season_timer >= SEASON_LENGTH:
             self.current_season += 1
-            self.season_timer = 0
-            # 1.4 Scarcity applied to seasonal spawn
+            # Winter (Odd seasons) reduces spawn rate but increases 'survival fuel' (Blue)
+            current_spawn_prob = 0.5 if self.current_season % 2 == 1 else 1.0
             for _ in range(int(20 * current_spawn_prob)): 
                 self.spawn_resource()
+            
+            # ❄️ WINTER SURVIVAL FIX: Force-spawn Blue resources in winter
+            if self.current_season % 2 == 1:
+                for _ in range(10):
+                    x, y = random.randint(0, self.size-1), random.randint(0, self.size-1)
+                    if (x, y) not in self.grid:
+                        res = Resource(x, y)
+                        res.type = 2 # Force Blue
+                        res.signal = torch.zeros(SIGNAL_DIM)
+                        res.signal[8:12] = 0.8
+                        self.grid[(x, y)] = res
+            self.season_timer = 0
         
         if self.time_step % 2 == 0:
             for _ in range(5): self.spawn_resource()

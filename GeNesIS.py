@@ -413,7 +413,7 @@ def update_simulation():
         if flux > 0: total_pos_flux += flux
         elif flux < 0: total_neg_flux += abs(flux)
             
-        learned = agent.metabolize_outcome(flux)
+        learned = agent.metabolize_outcome(flux, world_season=world.current_season)
         if learned: 
             current_thoughts += 1
             # 💡 INVENTION DISCOVERY
@@ -460,12 +460,13 @@ def update_simulation():
         # 1.4 Environmental Pressure: Scarcity scaling
         # ELASTIC: Only apply overcrowding penalty if population is healthy (> 240)
         if len(world.agents) >= 240:
-            # MIDDLE PATH FIX: Balanced decay for Darwinian Selection
-            # Was: 0.1 + log/10.0 (~0.7 cost) -> Now: 0.1 + log/4.0 (~1.6 cost)
             malthusian_cost = 0.1 + (np.log1p(len(world.agents)) / 4.0)
             
-            # SAGE BONUS: Elders (>100 ticks) are cleaner metabolizers
+            # SAGE BONUS: Elders (>80 ticks) are cleaner metabolizers
             if agent.age > 80: malthusian_cost *= 0.5
+
+            # Winter Resilience: Reduced Malthusian pressure in winter
+            if world.current_season % 2 == 1: malthusian_cost *= 0.5
             
             agent.energy -= malthusian_cost 
         
