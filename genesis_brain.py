@@ -1587,8 +1587,9 @@ class GenesisAgent:
             return False
         
         with torch.no_grad():
-            # PPO-128: Sampling more weights to match hidden_dim
-            weight_sample = next(self.brain.parameters()).flatten()[:128]
+            # PPO-128: Sampling from actor weights to match hidden_dim (128)
+            # This ensures weight_encoding fits padded_input's shape.
+            weight_sample = self.brain.actor.weight.flatten()[:128]
             weight_encoding = torch.sigmoid(weight_sample).unsqueeze(0)
             
             # Map input to 128 dimensions to match actor input
