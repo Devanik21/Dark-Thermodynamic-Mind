@@ -456,11 +456,15 @@ def update_simulation():
                     "Vector": reality_vector_tensor.tolist()[0]
                 })
             
+        # ☀️ AMBIENT ENERGY BUFF (Easy Mode)
+        ambient_energy = 2.0 if world.current_season % 2 == 0 else 0.5
+        agent.energy += ambient_energy
+
         # 📉 Malthusian Decay (Crowding Penalty)
         # 1.4 Environmental Pressure: Scarcity scaling
         # ELASTIC: Only apply overcrowding penalty if population is healthy (> 240)
         if len(world.agents) >= 240:
-            malthusian_cost = 0.1 + (np.log1p(len(world.agents)) / 4.0)
+            malthusian_cost = 0.05 + (np.log1p(len(world.agents)) / 6.0) # Reduced from 0.1 and 4.0
             
             # SAGE BONUS: Elders (>80 ticks) are cleaner metabolizers
             if agent.age > 80: malthusian_cost *= 0.5

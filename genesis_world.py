@@ -45,8 +45,8 @@ class PhysicsOracle(nn.Module):
         # Bias the "Energy" output (Index 0) SLIGHTLY positive
         # Was 0.5 (Too safe). Now 0.1 (Survival requires finding the peaks)
         with torch.no_grad():
-            self.layers[-1].bias[0] = 0.0 
-            self.layers[-1].bias[4] = -0.3 # Harsher drain on interaction
+            self.layers[-1].bias[0] = 0.4 # Boosted from 0.0 for "Easy Mode"
+            self.layers[-1].bias[4] = -0.2 # Reduced drain on interaction
             
     def forward(self, vector_21, matter_signal_16):
         x = torch.cat([vector_21, matter_signal_16], dim=1)
@@ -78,7 +78,7 @@ class Resource(Entity):
     def get_nutrition(self, current_season):
         # Summer (Even) favors Red/Green
         # Winter (Odd) favors Blue
-        base = 30.0
+        base = 50.0 # Boosted from 30.0 for easier thermodynamics
         
         is_summer = (current_season % 2 == 0)
         
@@ -788,14 +788,14 @@ class GenesisWorld:
         
         if self.season_timer >= SEASON_LENGTH:
             self.current_season += 1
-            # Winter (Odd seasons) reduces spawn rate but increases 'survival fuel' (Blue)
-            current_spawn_prob = 0.5 if self.current_season % 2 == 1 else 1.0
-            for _ in range(int(20 * current_spawn_prob)): 
+            # Seasonal boost - Summer is rich, Winter is managed but easier now
+            resources_to_spawn = 40 if self.current_season % 2 == 0 else 20
+            for _ in range(resources_to_spawn): 
                 self.spawn_resource()
             
             # ❄️ WINTER SURVIVAL FIX: Force-spawn Blue resources in winter
             if self.current_season % 2 == 1:
-                for _ in range(10):
+                for _ in range(15): # Increased from 10
                     x, y = random.randint(0, self.size-1), random.randint(0, self.size-1)
                     if (x, y) not in self.grid:
                         res = Resource(x, y)
