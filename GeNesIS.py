@@ -866,7 +866,8 @@ def collect_full_simulation_dna():
             "avg_self_acc": np.mean([a.self_model_accuracy for a in all_agents]) if all_agents else 0,
             "oracle_nodes": len(world.causal_graph_collective) if hasattr(world, 'causal_graph_collective') else 0,
             "proto_converg": getattr(world, 'protocol_convergence', 0),
-            "symbol_ground": getattr(world, 'symbol_grounding_r2', 0)
+            "symbol_ground": getattr(world, 'symbol_grounding_r2', 0),
+            "signal_silhouette": st.session_state.get('last_silhouette_score', 0.0) if st.session_state.get('last_silhouette_score', 0.0) > 0 else calculate_silhouette_safe(all_agents)
         },
         
 
@@ -1573,12 +1574,11 @@ with tab_micro:
                     n_clusters = min(len(X_comm), 4) 
                     kmeans = KMeans(n_clusters=n_clusters, random_state=42).fit(X_comm)
                     sil = silhouette_score(X_comm, kmeans.labels_)
+                    st.session_state.last_silhouette_score = sil
                     
                     # PCA for 2D Projection
                     pca = PCA(n_components=2)
                     X_pca = pca.fit_transform(X_comm)
-
-
                     
                     df_pca = pd.DataFrame(data=X_pca, columns=['PC1', 'PC2'])
                     df_pca['Cluster'] = kmeans.labels_.astype(str)
@@ -2053,18 +2053,24 @@ with tab_omega:
             # Preserve scale if not saved directly
             n_pop = omega.get('current_population', 0)
             max_age = omega.get('oldest_elder', 0)
-            max_energy = omega.get('average_energy', 0) # proxy
+            max_energy = omega.get('average_energy', 0) 
+            max_gen = omega.get('max_generation', 0)
+            gene_pool_size = omega.get('gene_pool_size', 0)
             
             milestones = []
             if max_age > 100: milestones.append("💀 Conquered Death")
             if max_energy > 200: milestones.append("🔋 Singularity Energy")
+            if max_gen > 50: milestones.append("🧬 Deep Evolution")
+            if gene_pool_size > 40: milestones.append("📚 Genetic Library Full")
             
             civ_type = "Type 0: Scavengers"
             if "Conquered Death" in str(milestones): civ_type = "Type I: Alchemists"
             if "Singularity Energy" in str(milestones): civ_type = "Type II: Gods"
             if n_pop > 500: civ_type = "Type III: Galactic Swarm"
+            if n_pop > 2000: civ_type = "Type IV: Universal Mind"
             
             st.metric("Preserved Scale", civ_type)
+            st.metric("Silhouette Score", f"{omega.get('signal_silhouette', 0.0):.3f}")
             st.metric("State Space Explored", f"10^-{omega.get('explorer_val', 202)}%") 
             st.write(f"**Discoveries:** `{omega.get('total_inventions', 0)}`")
 
@@ -2216,6 +2222,7 @@ with tab_omega:
         if len(st.session_state.world.agents) > 2000: civ_type = "Type IV: Universal Mind"
         
         st.metric("Civilization Scale", civ_type)
+        st.metric("Silhouette Score", f"{st.session_state.get('last_silhouette_score', 0.0):.3f}")
         
         # Logarithmic Exploration: 10^- (202 - log10(discoveries))
         # Total discoveries is 21D space, very vast. 
