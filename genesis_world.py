@@ -13,7 +13,8 @@ SIGNAL_DIM = 16
 MAX_ENERGY = 100000.0 # Effectively Infinite (Type II Civilization Potential)
 # "Easy mode" - metabolic cost is low, but stupidity kills
 METABOLIC_COST = 0.01 
-SEASON_LENGTH = 20 # Shortened winter (Nobel Optimization)
+SUMMER_LENGTH = 50
+WINTER_LENGTH = 15
 
 # ============================================================
 # 🔮 THE PHYSICS ORACLE (The Laws of Nature)
@@ -786,7 +787,9 @@ class GenesisWorld:
                                 "Vector": [0]*21
                             })
         
-        if self.season_timer >= SEASON_LENGTH:
+        # 🗓️ DYNAMIC SEASONAL CYCLES (Summer 50, Winter 15)
+        current_max = SUMMER_LENGTH if self.current_season % 2 == 0 else WINTER_LENGTH
+        if self.season_timer >= current_max:
             self.current_season += 1
             # Seasonal boost - Summer is rich, Winter is managed but easier now
             resources_to_spawn = 40 if self.current_season % 2 == 0 else 20
