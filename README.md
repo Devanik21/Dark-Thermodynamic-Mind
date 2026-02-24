@@ -1164,7 +1164,7 @@ Simulation Speed:
 
 ## 14. Code Availability & Citation
 
-**Repository:** https://github.com/Devanik21/genesis
+**Repository:** https://github.com/Devanik21/Dark-Thermodynamic-Mind
 
 **Files:**
 - `genesis_brain.py`: Agent architecture (GenesisBrain, PPOBuffer, GenesisAgent)
