@@ -692,20 +692,29 @@ class GenesisWorld:
                     try:
                         idx = int(res.type)
                         agent.inventory[idx] += 1
+                        
+                        # metabolic boost from resource nutrition (Winter survival fix)
+                        boost = res.get_nutrition(self.current_season)
+                        agent.energy += boost
+                        
                         # Synergy Bonus: Complete set (R,G,B) gives +30 Energy
                         if all(count > 0 for count in agent.inventory):
                             agent.energy += 30.0
                             for i in range(3): agent.inventory[i] -= 1
                             outcome_log = "🌟 SYNERGY BONUS!"
                         else:
-                            outcome_log = f"😋 CONSUMED {['Red','Green','Blue'][idx]}"
-                    except (ValueError, TypeError):
+                            outcome_log = f"😋 CONSUMED {['Red','Green','Blue'][idx]} (+{boost:.0f}E)"
+                    except (ValueError, TypeError, AttributeError):
                         # This handles 'mega_resource' or any other non-standard entity
-                        agent.energy += 150.0 
-                        outcome_log = "💎 MEGA-RESOURCE HARVESTED!"
+                        boost = res.get_nutrition(self.current_season) if hasattr(res, 'get_nutrition') else 150.0
+                        agent.energy += boost
+                        outcome_log = f"💎 MEGA-RESOURCE HARVESTED! (+{boost:.0f}E)"
                     
                     del self.grid[loc]
             else: outcome_log = "🔥 NEGATIVE FLUX (-)"
+            
+            # --- Energy Floor (Prevent Unphysical Negatives) ---
+            if agent.energy < -100.0: agent.energy = -100.0
         
         return energy_flux, outcome_log
 

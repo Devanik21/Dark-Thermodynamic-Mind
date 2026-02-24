@@ -824,8 +824,9 @@ class GenesisAgent:
             old_log_prob = self.ppo_buffer.get_old_log_prob()
             
             if old_log_prob is not None:
-                # PPO Importance Sampling Ratio
+                # PPO Importance Sampling Ratio (Clamped to prevent explosion)
                 ratio = torch.exp(new_log_prob - old_log_prob)
+                ratio = torch.clamp(ratio, 0.0, 10.0)
                 
                 # Clipped Surrogate Loss (THE PPO CORE)
                 surr1 = ratio * advantage
@@ -862,7 +863,10 @@ class GenesisAgent:
         
         total_loss.backward()
         
-        # Track gradient stats for dashboard
+        # 🔧 CRITICAL FIX: Gradient Capping to prevent IQ Explosion (Infinite Weights)
+        torch.nn.utils.clip_grad_norm_(self.brain.parameters(), max_norm=1.0)
+        
+        # Track gradient stats for dashboard (After clipping for accuracy)
         try:
              total_norm = 0.0
              for p in self.brain.parameters():
@@ -882,9 +886,6 @@ class GenesisAgent:
              
         # 5.1 Meta-Learning: Adjust meta_lr based on gradient norm
         self.meta_lr = 0.005 * (1.0 + 0.1 * np.tanh(self.last_grad_norm))
-
-        # 🔧 CRITICAL FIX: Gradient Capping to prevent IQ Explosion (Infinite Weights)
-        torch.nn.utils.clip_grad_norm_(self.brain.parameters(), max_norm=1.0)
         
         self.optimizer.step()
         
