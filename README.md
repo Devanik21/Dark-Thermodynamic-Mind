@@ -2,7 +2,7 @@
 
 ## Dark Genesis: Proximal Policy Optimization with Latent Memory in Silico
 
-**A zero-logic ecosystem where 100 agents evolve through PPO learning with inherited latent memories, adapting to thermodynamic constraints. Proving General Intelligence through convergent reinforcement learning.**
+**A zero-logic ecosystem where 256 agents evolve through PPO learning with inherited latent memories, adapting to thermodynamic constraints. Proving General Intelligence through convergent reinforcement learning.**
 
 **Version:** 12.0.0 | **Release:** February 24, 2026
 
