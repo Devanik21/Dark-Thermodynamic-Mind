@@ -24,7 +24,7 @@
 
 **PPO-128 + Latent Memory + Evolutionary Dynamics = Convergent Self-Organization**
 
-We implement Proximal Policy Optimization (PPO) with inherited latent memories in 100 concurrent agents navigating a thermodynamically constrained 2D world. Each agent maintains a 128-dimensional GRU hidden state that encodes learned behavioral patterns, which is partially inherited by offspring and corrupted by developmental noise. This creates a bio-inspired system where "nature" (latent initialization) and "nurture" (PPO updates) jointly determine fitness.
+We implement Proximal Policy Optimization (PPO) with inherited latent memories in 256 concurrent agents navigating a thermodynamically constrained 2D world. Each agent maintains a 128-dimensional GRU hidden state that encodes learned behavioral patterns, which is partially inherited by offspring and corrupted by developmental noise. This creates a bio-inspired system where "nature" (latent initialization) and "nurture" (PPO updates) jointly determine fitness.
 
 **Core Mechanism:**
 ```
