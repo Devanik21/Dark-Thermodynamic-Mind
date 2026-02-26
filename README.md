@@ -1,4 +1,4 @@
-# GeNesIS-II: Generative Neural System for Information-theoretic Self-awareness
+# GeNesIS-II: Generative Neural System for Information-theoretic Self-awareness (PPO)
 
 ## Dark Genesis: Proximal Policy Optimization with Latent Memory in Silico
 
