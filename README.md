@@ -18,7 +18,8 @@
 [![Twitter](https://img.shields.io/badge/Twitter-@devanik2005-1DA1F2?style=flat&logo=twitter)](https://x.com/devanik2005)
 [![arXiv](https://img.shields.io/badge/arXiv-2402.xxxxx-b31b1b.svg)](https://arxiv.org/abs/2402.xxxxx)
 
----
+
+<img width="1536" height="1024" alt="7405db2d-23b2-4a6d-be84-236cb9df7111" src="https://github.com/user-attachments/assets/3413e42d-fd36-4c4e-88dd-b2d6686e3041" />
 
 ## Abstract
 
